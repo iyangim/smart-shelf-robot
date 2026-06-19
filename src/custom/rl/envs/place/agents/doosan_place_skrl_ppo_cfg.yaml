@@ -1,0 +1,82 @@
+# Task 4: Shelf Placing & Alignment — PPO 에이전트 하이퍼파라미터 설정
+# ~/smart-shelf-robot/src/custom/rl/envs/place/agents/doosan_place_skrl_ppo_cfg.yaml
+#
+# task_define.md Task 4 Place 에 최적화된 PPO 학습 설정.
+# Pick 태스크 대비:
+# - 네트워크 크기 확대: [128, 64] → [128, 128] (관측 차원 ~41로 증가)
+# - 학습률 추가 하향: 3e-4 → 1e-4 (정밀 정렬의 안정적 수렴)
+# - 에피소드 길이 증가: 10초 (정밀 삽입/정렬 소요 시간 반영)
+# - timesteps 증가: 72000 (수렴까지 충분한 학습 기회)
+# - 커리큘럼 학습을 지원하기 위한 보수적 엔트로피 스케일
+
+seed: 42
+
+# 모델 설정
+models:
+  separate: False
+  policy:
+    class: GaussianMixin
+    clip_actions: False
+    clip_log_std: True
+    min_log_std: -20.0
+    max_log_std: 2.0
+    initial_log_std: 0.0
+    network:
+      - name: net
+        input: OBSERVATIONS
+        layers: [128, 128]   # 관측 차원 ~41 대응 + 정렬/삽입 복합 행동 표현력
+        activations: elu
+    output: ACTIONS
+  value:
+    class: DeterministicMixin
+    clip_actions: False
+    network:
+      - name: net
+        input: OBSERVATIONS
+        layers: [128, 128]
+        activations: elu
+    output: ONE
+
+# 롤아웃 메모리
+memory:
+  class: RandomMemory
+  memory_size: -1
+
+# PPO 에이전트
+agent:
+  class: PPO
+  rollouts: 32             # Place는 에피소드가 길어서 rollout 확대
+  learning_epochs: 5
+  mini_batches: 4
+  discount_factor: 0.99
+  lambda: 0.95
+  learning_rate: 1.0e-04   # 정밀 정렬 수렴 안정성 — Pick(3e-4) 대비 보수적
+  learning_rate_scheduler: KLAdaptiveLR
+  learning_rate_scheduler_kwargs:
+    kl_threshold: 0.008    # 미세 정렬 학습에서의 정책 변동 억제
+  state_preprocessor: RunningStandardScaler
+  state_preprocessor_kwargs: null
+  value_preprocessor: RunningStandardScaler
+  value_preprocessor_kwargs: null
+  random_timesteps: 0
+  learning_starts: 0
+  grad_norm_clip: 1.0
+  ratio_clip: 0.2
+  value_clip: 0.2
+  clip_predicted_values: True
+  entropy_loss_scale: 0.005  # 보수적 탐색 — 정밀 정렬 시 과도한 탐색 억제
+  value_loss_scale: 1.0
+  kl_threshold: 0.0
+  rewards_shaper_scale: 1.0
+  time_limit_bootstrap: False
+  experiment:
+    directory: "place_doosan_e0509"
+    experiment_name: ""
+    write_interval: auto
+    checkpoint_interval: auto
+
+# 트레이너
+trainer:
+  class: SequentialTrainer
+  timesteps: 72000           # 정밀 적재는 긴 학습이 필요
+  environment_info: log

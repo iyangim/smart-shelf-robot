@@ -1,0 +1,81 @@
+# Task 2: Object Pick-up — PPO 에이전트 하이퍼파라미터 설정
+# ~/smart-shelf-robot/src/custom/rl/envs/pick/agents/doosan_pick_skrl_ppo_cfg.yaml
+#
+# task_define.md Task 2 Pick-up 에 최적화된 PPO 학습 설정.
+# 기존 Reach 태스크(doosan_skrl_ppo_cfg.yaml) 대비:
+# - 네트워크 크기 확대: [64, 64] → [128, 64] (관측/행동 차원 증가 반영)
+# - 학습률 하향: 1e-3 → 3e-4 (접촉 역학의 안정적 학습)
+# - rollouts 유지: 24 (충분한 탐색 범위)
+# - 에피소드 길이 반영: timesteps 증가 (48000)
+
+seed: 42
+
+# 모델 설정
+models:
+  separate: False
+  policy:
+    class: GaussianMixin
+    clip_actions: False
+    clip_log_std: True
+    min_log_std: -20.0
+    max_log_std: 2.0
+    initial_log_std: 0.0
+    network:
+      - name: net
+        input: OBSERVATIONS
+        layers: [128, 64]   # Reach(64,64) 대비 첫 레이어 확대 — obs 차원 증가 대응
+        activations: elu
+    output: ACTIONS
+  value:
+    class: DeterministicMixin
+    clip_actions: False
+    network:
+      - name: net
+        input: OBSERVATIONS
+        layers: [128, 64]
+        activations: elu
+    output: ONE
+
+# 롤아웃 메모리
+memory:
+  class: RandomMemory
+  memory_size: -1
+
+# PPO 에이전트
+agent:
+  class: PPO
+  rollouts: 24
+  learning_epochs: 5
+  mini_batches: 4
+  discount_factor: 0.99
+  lambda: 0.95
+  learning_rate: 3.0e-04       # 접촉 역학 안정 학습을 위해 Reach(1e-3) 대비 보수적
+  learning_rate_scheduler: KLAdaptiveLR
+  learning_rate_scheduler_kwargs:
+    kl_threshold: 0.01
+  state_preprocessor: RunningStandardScaler
+  state_preprocessor_kwargs: null
+  value_preprocessor: RunningStandardScaler
+  value_preprocessor_kwargs: null
+  random_timesteps: 0
+  learning_starts: 0
+  grad_norm_clip: 1.0
+  ratio_clip: 0.2
+  value_clip: 0.2
+  clip_predicted_values: True
+  entropy_loss_scale: 0.01
+  value_loss_scale: 1.0
+  kl_threshold: 0.0
+  rewards_shaper_scale: 1.0
+  time_limit_bootstrap: False
+  experiment:
+    directory: "pick_doosan_e0509"
+    experiment_name: ""
+    write_interval: auto
+    checkpoint_interval: auto
+
+# 트레이너
+trainer:
+  class: SequentialTrainer
+  timesteps: 48000             # Reach(24000) 대비 2배 — Pick-up 에피소드가 더 길고 복잡
+  environment_info: log

@@ -2,7 +2,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, PointCloud2, PointField
+from sensor_msgs.msg import Image, PointCloud2, PointField, CameraInfo
 from std_msgs.msg import String, Header
 from cv_bridge import CvBridge
 
@@ -11,8 +11,7 @@ try:
 except ImportError:
     pc2 = None
 
-# RealSense D455f 카메라 내부 파라미터 — 실제 값으로 교체 필요
-# (ros2 topic echo /camera/color/camera_info 에서 확인)
+# Default Fallback Intrinsics
 CAMERA_FX = 615.0
 CAMERA_FY = 615.0
 CAMERA_CX = 320.0
@@ -26,18 +25,26 @@ class PointCloudNode(Node):
 
     흐름:
       /camera/color/image_raw  ─┐
-      /camera/depth/image_rect_raw ─┤→ SAM 세그멘테이션 → depth 역투영 → /object_pointcloud
+      /camera/aligned_depth_to_color/image_raw ─┤→ SAM 세그멘테이션 → depth 역투영 → /object_pointcloud
       /object_class (YOLO bbox) ─┘
     """
 
     def __init__(self):
         super().__init__('pointcloud_node')
 
+        # Intrinsics instance variables
+        self.fx = CAMERA_FX
+        self.fy = CAMERA_FY
+        self.cx = CAMERA_CX
+        self.cy = CAMERA_CY
+
         # Subscribers
         self.sub_color = self.create_subscription(
             Image, '/camera/color/image_raw', self._color_cb, 10)
         self.sub_depth = self.create_subscription(
-            Image, '/camera/depth/image_rect_raw', self._depth_cb, 10)
+            Image, '/camera/aligned_depth_to_color/image_raw', self._depth_cb, 10)
+        self.sub_cam_info = self.create_subscription(
+            CameraInfo, '/camera/depth/camera_info', self._cam_info_cb, 10)
         self.sub_object_class = self.create_subscription(
             String, '/object_class', self._object_class_cb, 10)
 
@@ -71,6 +78,11 @@ class PointCloudNode(Node):
     def _depth_cb(self, msg: Image):
         self.depth_image = self.bridge.imgmsg_to_cv2(msg, '16UC1')
 
+    def _cam_info_cb(self, msg: CameraInfo):
+        # camera_info로 수신된 파라미터로 내부파라미터 업데이트
+        self.fx, self.fy = msg.k[0], msg.k[4]
+        self.cx, self.cy = msg.k[2], msg.k[5]
+
     def _object_class_cb(self, msg: String):
         # detection_node가 bbox 토픽을 별도 발행하도록 협의 필요.
         # 현재는 클래스 수신 시 최신 이미지로 처리 트리거.
@@ -102,21 +114,24 @@ class PointCloudNode(Node):
         return None
 
     def _depth_to_pointcloud(self, depth_image, mask):
-        # TODO: 마스크 영역 depth 픽셀을 카메라 내부 파라미터로 3D 좌표 변환
-        #
-        #   ys, xs = np.where(mask)
-        #   z = depth_image[ys, xs].astype(np.float32) * DEPTH_SCALE   # mm → m
-        #   valid = z > 0
-        #   xs, ys, z = xs[valid], ys[valid], z[valid]
-        #
-        #   x = (xs - CAMERA_CX) * z / CAMERA_FX
-        #   y = (ys - CAMERA_CY) * z / CAMERA_FY
-        #   points = np.stack([x, y, z], axis=1)   # shape (N, 3)
-        #
-        #   header = Header()
-        #   header.stamp = self.get_clock().now().to_msg()
-        #   header.frame_id = 'camera_color_optical_frame'
-        #   return pc2.create_cloud_xyz32(header, points.tolist())
+        # 마스크 영역 depth 픽셀을 카메라 내부 파라미터로 3D 좌표 변환
+        ys, xs = np.where(mask)
+        z = depth_image[ys, xs].astype(np.float32) * DEPTH_SCALE   # mm → m
+        valid = z > 0
+        xs, ys, z = xs[valid], ys[valid], z[valid]
+
+        if len(z) == 0:
+            return None
+
+        x = (xs - self.cx) * z / self.fx
+        y = (ys - self.cy) * z / self.fy
+        points = np.stack([x, y, z], axis=1)   # shape (N, 3)
+
+        header = Header()
+        header.stamp = self.get_clock().now().to_msg()
+        header.frame_id = 'camera_color_optical_frame'
+        if pc2 is not None:
+            return pc2.create_cloud_xyz32(header, points.tolist())
         return None
 
 

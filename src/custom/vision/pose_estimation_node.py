@@ -10,15 +10,14 @@ from cv_bridge import CvBridge
 
 # 핸드아이 캘리브레이션 결과 (T_cam2base 4x4 + camera_matrix). 08_핸드아이_캘리브레이션 산출물.
 # object_tracking_node.py 와 동일 파일을 공유한다.
-DEFAULT_CALIB = "/home/fastcampus/Downloads/test/로봇강의_예제/_RealProject_0/doosan_ws/" \
-                "src/e0509_gripper_description/scripts/calibration_result.npz"
+DEFAULT_CALIB = "/home/iyangim/smart-shelf-robot/src/vision/calibration_result.npz"
 
 
 class PoseEstimationNode(Node):
     """2D 픽셀(/object_pose_2d) + depth → 로봇 base_link 기준 6D pose(/object_pose).
 
     파이프라인: detection(2D) → /object_pose_2d(u,v 픽셀) ─┐
-                RealSense depth /camera/depth/image_rect_raw ┼→ 본 노드 → /object_pose(PoseStamped, base_link)
+                RealSense depth /camera/aligned_depth_to_color/image_raw ┼→ 본 노드 → /object_pose(PoseStamped, base_link)
     - 위치: pinhole 역투영(카메라 내부파라미터) → 카메라 광학좌표 3D → T_cam2base 로 base_link 변환.
     - 자세: top-down 파지 쿼터니언(make_down_quaternion) + 입력 2D pose 가 yaw 를 실어오면 반영 → 6D.
     """
@@ -45,7 +44,7 @@ class PoseEstimationNode(Node):
 
         # Subscribers
         self.sub_depth = self.create_subscription(
-            Image, '/camera/depth/image_rect_raw', self.depth_callback, 10)
+            Image, '/camera/aligned_depth_to_color/image_raw', self.depth_callback, 10)
         self.sub_object_pose_2d = self.create_subscription(
             PoseStamped, '/object_pose_2d', self.pose_2d_callback, 10)
         # camera_info 가 있으면 실시간 해상도에 맞는 내부파라미터로 덮어씀(없으면 calib 값 사용)

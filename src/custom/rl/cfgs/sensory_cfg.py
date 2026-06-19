@@ -2,7 +2,8 @@
 # 2.4 Hand-in-Eye 카메라 가상 링크 연동 및 관측 공간 정의
 # ~/smart-shelf-robot/src/custom/rl/cfgs/sensory_cfg.py 
 
-from omni.isaac.lab.sensors import CameraCfg 
+from isaaclab.sensors import CameraCfg
+
 
 HAND_IN_EYE_CAMERA_CFG = CameraCfg( 
     prim_path="{ENV_REGEX_EXPR}/robot/link_6/realsense_camera", 

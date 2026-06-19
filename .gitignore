@@ -24,3 +24,7 @@ third_party/
 
 # Miniconda installer
 Miniconda3-latest-Linux-x86_64.sh
+
+# Local training logs and outputs
+logs/
+outputs/
