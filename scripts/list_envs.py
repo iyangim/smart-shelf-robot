@@ -30,10 +30,17 @@ simulation_app = app_launcher.app
 import gymnasium as gym
 from prettytable import PrettyTable
 
-import franka_isaaclab.tasks  # noqa: F401
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
+import custom.rl.envs.pick  # noqa: F401
+import custom.rl.envs.place  # noqa: F401
+import custom.rl.envs.stack  # noqa: F401
+import custom.rl.envs.lift  # noqa: F401
+import custom.rl.envs.reach  # noqa: F401
 
 def main():
-    """Print all environments registered in `franka_isaaclab` extension."""
+    """Print all environments registered in the extension."""
     # print all the available environments
     table = PrettyTable(["S. No.", "Task Name", "Entry Point", "Config"])
     table.title = "Available Environments in Isaac Lab"
@@ -46,9 +53,9 @@ def main():
     index = 0
     # acquire all Isaac environments names
     for task_spec in gym.registry.values():
-        if "Template-" in task_spec.id:
+        if "Template-" in task_spec.id or "Doosan-" in task_spec.id:
             # add details to table
-            table.add_row([index + 1, task_spec.id, task_spec.entry_point, task_spec.kwargs["env_cfg_entry_point"]])
+            table.add_row([index + 1, task_spec.id, task_spec.entry_point, task_spec.kwargs.get("env_cfg_entry_point", "None")])
             # increment count
             index += 1
 

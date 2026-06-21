@@ -4,10 +4,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import math
+import os
+import sys
+
 from isaaclab.utils import configclass
 import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
 from isaaclab_tasks.manager_based.manipulation.reach.reach_env_cfg import ReachEnvCfg
-from franka_isaaclab.assets.robots.doosan import DOOSAN_E0509_CFG
+
+# Add custom rl path to system path for importing cfgs
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from cfgs.doosan_shelf_assets_cfg import DOOSAN_E0509_CFG
 
 @configclass
 class DoosanReachEnvCfg(ReachEnvCfg):

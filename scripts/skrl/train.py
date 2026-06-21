@@ -120,10 +120,9 @@ from isaaclab_rl.skrl import SkrlVecEnvWrapper
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-import franka_isaaclab.tasks  # noqa: F401
-
 # Add custom shelf robot tasks path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src"))
+import custom.rl.envs.reach  # noqa: F401
 import custom.rl.envs.pick  # noqa: F401
 import custom.rl.envs.place  # noqa: F401
 import custom.rl.envs.stack  # noqa: F401

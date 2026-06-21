@@ -7,11 +7,13 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 
 
+from isaaclab.actuators import ImplicitActuatorCfg
+
 # 1. 두산 E0509 협동로봇 에셋 기하학적 강체 컴포넌트 정의 
 DOOSAN_E0509_CFG = ArticulationCfg( 
     prim_path="{ENV_REGEX_EXPR}/robot", 
     spawn=sim_utils.UsdFileCfg( 
-        usd_path=os.path.expanduser("~/smart-shelf-robot/src/custom/rl/assets/doosan_e0509.usd"), 
+        usd_path=os.path.expanduser("~/smart-shelf-robot/src/external/doosan-robot2/dsr_description2/usd/e0509.usd"), 
         rigid_props=sim_utils.RigidBodyPropertiesCfg( 
             disable_gravity=False, 
             retain_accelerations=False, 
@@ -38,6 +40,15 @@ DOOSAN_E0509_CFG = ArticulationCfg(
         pos=(0.0, 0.0, 0.0), 
         rot=(1.0, 0.0, 0.0, 0.0), 
     ), 
+    actuators={
+        "doosan_arm": ImplicitActuatorCfg(
+            joint_names_expr=["joint_?[1-6]"],
+            stiffness=800.0,
+            damping=40.0,
+            friction=0.1,
+        ),
+    },
+    soft_joint_pos_limit_factor=1.0,
 ) 
 
 # 2. 편의점 스마트 진열대 가판대 환경 구조화 정의 
