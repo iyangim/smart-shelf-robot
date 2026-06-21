@@ -26,9 +26,9 @@ from .pick_env_cfg import PickEnvCfg
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
-# 두산 E0509 로봇 에셋 (그리퍼 통합형) — cfgs/doosan_shelf_assets_cfg.py
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from cfgs.dynamic_objects_cfg import get_dynamic_object_cfg  # noqa: E402
 from cfgs.doosan_shelf_assets_cfg import DOOSAN_E0509_WITH_GRIPPER_CFG  # noqa: E402
 from cfgs.gripper_cfg import (  # noqa: E402
     GRIPPER_JOINT_NAMES,
@@ -47,6 +47,9 @@ class DoosanPickEnvCfg(PickEnvCfg):
     - Action Space: [6 + 1] 조인트 변위 + 그리퍼 바이너리
     - Observation: 관절 + EE + 물체 + 그리퍼 → ~33 dim
     """
+
+    # 대상 물품 종류 ("cube", "can", "bottle", "snack_bag")
+    object_type: str = os.getenv("OBJECT_TYPE", "cube")
 
     def __post_init__(self):
         # 부모 초기화
@@ -80,25 +83,14 @@ class DoosanPickEnvCfg(PickEnvCfg):
         self.gripper_threshold = GRIPPER_GRASP_THRESHOLD
 
         # ── 대상 물체 설정 ─────────────────────────────────────
-        # 바구니 안의 파지 대상 물체 (임시: Isaac Sim DexCube)
-        self.scene.object = RigidObjectCfg(
+        # 바구니 안의 파지 대상 물체 (CFG 팩토리를 통해 동적 생성)
+        from cfgs.dynamic_objects_cfg import OBJECT_HEIGHT_OFFSETS
+        z_offset = 0.035 + OBJECT_HEIGHT_OFFSETS[self.object_type]
+        self.scene.object = get_dynamic_object_cfg(
+            self.object_type,
             prim_path="{ENV_REGEX_NS}/Object",
-            init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.4, 0.0, 0.055],  # 바구니 내부 바닥 위
-                rot=[1, 0, 0, 0],
-            ),
-            spawn=UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-                scale=(0.8, 0.8, 0.8),
-                rigid_props=RigidBodyPropertiesCfg(
-                    solver_position_iteration_count=16,
-                    solver_velocity_iteration_count=1,
-                    max_angular_velocity=1000.0,
-                    max_linear_velocity=1000.0,
-                    max_depenetration_velocity=5.0,
-                    disable_gravity=False,
-                ),
-            ),
+            pos=[0.4, 0.0, z_offset],
+            rot=[1.0, 0.0, 0.0, 0.0],
         )
 
         # ── 엔드이펙터 프레임 설정 ────────────────────────────

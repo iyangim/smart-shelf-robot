@@ -25,9 +25,9 @@ from .place_env_cfg import PlaceEnvCfg
 ##
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
-# 두산 E0509 로봇 에셋 (그리퍼 통합형) — cfgs/doosan_shelf_assets_cfg.py
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+from cfgs.dynamic_objects_cfg import get_dynamic_object_cfg  # noqa: E402
 from cfgs.doosan_shelf_assets_cfg import DOOSAN_E0509_WITH_GRIPPER_CFG  # noqa: E402
 from cfgs.gripper_cfg import (  # noqa: E402
     GRIPPER_JOINT_NAMES,
@@ -46,6 +46,9 @@ class DoosanPlaceEnvCfg(PlaceEnvCfg):
     - Action Space: [6 + 1] 조인트 명령 + 그리퍼 해제 신호
     - 물체를 파지한 상태에서 시작하여 매대 슬롯에 정밀 배치
     """
+
+    # 대상 물품 종류 ("cube", "can", "bottle", "snack_bag")
+    object_type: str = os.getenv("OBJECT_TYPE", "cube")
 
     def __post_init__(self):
         # 부모 초기화
@@ -90,34 +93,25 @@ class DoosanPlaceEnvCfg(PlaceEnvCfg):
         self.gripper_threshold = GRIPPER_GRASP_THRESHOLD
 
         # ── 배치 대상 물체 (파지된 상태로 초기화) ──────────────
-        # 초기 위치: EE 근처 (파지 중)
-        self.scene.object = RigidObjectCfg(
+        # 초기 위치: EE 근처 (파지 중 - CFG 팩토리를 통해 동적 생성)
+        from cfgs.dynamic_objects_cfg import OBJECT_HEIGHT_OFFSETS
+        z_init = 0.33 + OBJECT_HEIGHT_OFFSETS[self.object_type]
+        self.scene.object = get_dynamic_object_cfg(
+            self.object_type,
             prim_path="{ENV_REGEX_NS}/Object",
-            init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.35, 0.0, 0.35],   # 매대 앞 EE 근처
-                rot=[1, 0, 0, 0],
-            ),
-            spawn=UsdFileCfg(
-                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
-                scale=(0.8, 0.8, 0.8),
-                rigid_props=RigidBodyPropertiesCfg(
-                    solver_position_iteration_count=16,
-                    solver_velocity_iteration_count=1,
-                    max_angular_velocity=1000.0,
-                    max_linear_velocity=1000.0,
-                    max_depenetration_velocity=5.0,
-                    disable_gravity=False,
-                ),
-            ),
+            pos=[0.35, 0.0, z_init],
+            rot=[1.0, 0.0, 0.0, 0.0],
         )
 
         # ── 매대 빈 슬롯 (배치 목표 마커) ────────────────────
         # 슬롯은 비가시 Rigid Body로, 물체 배치 목표 위치를 나타냅니다.
+        # 매대 바닥 높이(z=0.28) 기준으로 물품 중심 높이를 정밀 계산
+        z_slot = 0.28 + OBJECT_HEIGHT_OFFSETS[self.object_type]
         self.scene.slot = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Slot",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.55, 0.0, 0.30],   # 매대 내부 슬롯 중심
-                rot=[1, 0, 0, 0],
+                pos=[0.55, 0.0, z_slot],   # 매대 내부 슬롯 중심
+                rot=[1.0, 0.0, 0.0, 0.0],
             ),
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
