@@ -40,39 +40,40 @@ graph LR
 
 ---
 
-## Slide 3: Sim-to-Real 정책 이식 (Policy Porting)
-### ONNX 변환 및 실시간 추론 연동
-- **ONNX 경량화**: PyTorch `.pt` 가중치를 [export_onnx.py](file:///home/iyangim/smart-shelf-robot/src/custom/rl/scratch/export_onnx.py) 스크립트를 사용하여 `policy.onnx` 포맷으로 변환
-  - 관측값 평균/분산 정규화 전처리기를 모델 내부에 포함시켜 추론 입력 편의성 증대
-- **추론 노드 구현**: [policy_node.py](file:///home/iyangim/smart-shelf-robot/src/rl/policy_node.py)
-  - `onnxruntime` 엔진 탑재로 CPU/GPU 가속 실시간 추론 수행
-  - 실물 로봇의 관절 각도 정렬 상태인 `/joint_states`를 실시간 수신하여 에이전트 관측 공간으로 재구성
+## Slide 3: ROS 2 패키지 및 빌드 환경 (ROS 2 Workspaces)
+### colcon 빌드 체계 및 의존성 정합
+- **커스텀 ROS 2 패키지**:
+  - `custom_interfaces`: `ShelfManipulate` 액션 등의 ROS 2 인터페이스 빌드
+  - `smart_shelf_robot`: VLA-Diffusion 제어 브릿지 및 실시간 추론 연동 노드 탑재
+- **의존성 다운그레이드**: ROS 2 Humble 빌드 템플릿과의 호환성을 고려하여 `empy` 라이브러리를 `3.3.4` 버전으로 빌드 정합 적용 및 `lark` 파서 설치
 
 ```mermaid
 graph TD
-    PT[best_agent.pt] --> Export[export_onnx.py]
-    Export --> ONNX[policy.onnx]
-    ONNX --> ORT[onnxruntime 추론 실행]
+    WS[스마트 매대 워크스페이스] --> CI[custom_interfaces 패키지]
+    WS --> SR[smart_shelf_robot 패키지]
+    CI -- 액션 종속성 --> SR
+    SR -- colcon build --> Built[설치 및 실행 환경 소싱]
 ```
 
 *Diagram Image Prompt*:
-`Code file transition icon from PyTorch logo to ONNX logo, glowing pipeline lines on dark slate, minimalist modern slide graphic.`
+`Clean 3D block folders representing custom ROS 2 packages merging into a single compiler workspace, tech aesthetic.`
 
 ---
 
-## Slide 4: ROS 2 핵심 통신 인터페이스 (ROS 2 Interfaces)
-### 모듈 간 유기적인 제어를 위한 토픽 및 노드 설계
-- **관절 타깃 제어**:
-  - `/policy/joint_targets` 토픽을 발행하여 모션 플래너 또는 실물 드라이버에 관절 절대 명령 전달
-  - 수동 관절 스케일링 필터 적용 ($q_{\text{target}} = q_{\text{default}} + a \times 0.5$)
-- **비전 센서 인터페이스**:
-  - `/camera/aligned_depth_to_color/image_raw`를 정합된 깊이 정보 획득용으로 구독
-  - `/object_pose` (3차원 위치 및 자세 쿼터니언)를 수신하여 최종 도달 목표로 정책에 주입
+## Slide 4: VLA-Diffusion 액션 통신 인터페이스 (Action Interfaces)
+### ShelfManipulate 액션을 통한 비동기 제어 루프
+- **고수준 비동기 제어**:
+  - `vla_bridge_node`가 `/shelf_manipulate` 액션 서버 기동 (자연어 명령 수집 및 피드백 스트리밍)
+  - `MultiThreadedExecutor` 스핀을 통해 토픽 구독 및 액션 처리가 교착 상태 없이 비동기로 실행 보장
+- **실시간 30Hz 제어**:
+  - `diffusion_inference_node`에서 30Hz 주기로 Twist 제어 타깃을 `/dsr01/servol_cmd`로 발행
 
 ```mermaid
 graph TD
-    Node1[policy_node] -- /policy/joint_targets --> Node2[doosan_real_hardware_bridge]
-    Node3[pose_estimation_node] -- /object_pose --> Node1
+    Client[Action Client] -- /shelf_manipulate --> Server[vla_bridge_node 액션 서버]
+    Server -- /camera/color/image_raw --> Image[카메라 이미지 프레임]
+    Server -- Twist 변위 --> Diff[diffusion_inference_node]
+    Diff -- 30Hz 제어 명령 --> Hardware[Doosan 로봇 컨트롤러]
 ```
 
 *Diagram Image Prompt*:
@@ -183,10 +184,10 @@ graph LR
 
 ## Slide 10: 성과 요약 및 검증 (Summary & Verification)
 ### Phase 4 실하드웨어 정합 테스트 결과
-- **정합성 확보**:
-  - 카메라 뎁스 정렬 토픽 수정을 완료하고, hand-eye 캘리브레이션 행렬 오차 범위를 실물 작동 검증 수준으로 유지
-  - ONNX 변환 모델 로딩 시간 최적화로 추론 주기 속도를 20Hz 이상으로 끌어올려 밀접 제어 루프 정상 작동 검증
-- **향후 계획**: 실물 환경 내 다수의 실물 과자 패키지를 사용한 종합 시나리오 테스트 착수
+- **빌드 및 런타임 검증**:
+  - `colcon` 빌드 환경을 구축하여 커스텀 ROS 2 패키지 빌드에 성공하고 `ShelfManipulate` 액션 등록 완료
+  - `vla_bridge_node` 내부의 런타임 임포트 오류를 수정하고, 멀티스레드 실행기를 적용하여 피드백 대기 중 데드락 문제 완벽 해결
+- **향후 계획**: 실물 환경 내 다수의 실물 과자 패키지를 사용한 종합 VLA-Diffusion 시나리오 테스트 착수
 
 ```mermaid
 graph TD
