@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# 3.3 비동기 프로세스 통신 (ROS 2 Action Server) 인터페이스 구성
-
+import time
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
+from rclpy.executors import MultiThreadedExecutor
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import PoseStamped
@@ -78,11 +76,13 @@ class VlaBridgeNode(Node):
         return result
 
 if __name__ == '__main__':
-    import time
     rclpy.init()
     node = VlaBridgeNode()
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
+    node.destroy_node()
     rclpy.shutdown()
