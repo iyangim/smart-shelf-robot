@@ -5,7 +5,8 @@
 import os
 import sys
 
-from isaaclab.assets import RigidObjectCfg
+import isaaclab.sim as sim_utils
+from isaaclab.assets import AssetBaseCfg, RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
@@ -65,7 +66,7 @@ class EventCfg:
         func=doosan_stack_events.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.4, 0.6), "y": (-0.15, 0.15), "z": (0.025, 0.025), "yaw": (-1.0, 1.0)},
+            "pose_range": {"x": (0.45, 0.65), "y": (-0.15, 0.15), "z": (0.025, 0.025), "yaw": (-1.0, 1.0)},
             "min_separation": 0.12,
             "asset_cfgs": [SceneEntityCfg("cube_1"), SceneEntityCfg("cube_2")],
         },
@@ -87,6 +88,21 @@ class DoosanCubeStackEnvCfg(StackEnvCfg):
         self.scene.robot = DOOSAN_E0509_WITH_GRIPPER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]
 
+        # Add robot mount stand
+        self.scene.mount = AssetBaseCfg(
+            prim_path="{ENV_REGEX_NS}/Mount",
+            spawn=sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/Stand/stand_instanceable.usd",
+                scale=(2.0, 2.0, 2.0),
+            ),
+            init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        )
+
+        # Override table to match Task 1 (Reach)
+        self.scene.table.init_state.pos = (0.55, 0.0, 0.0)
+        self.scene.table.init_state.rot = (0.70711, 0.0, 0.0, 0.70711)
+        self.scene.table.spawn.scale = (1.0, 1.0, 1.0)
+
         # Add semantics to mount structures
         self.scene.table.spawn.semantic_tags = [("class", "table")]
         self.scene.plane.semantic_tags = [("class", "ground")]
@@ -95,7 +111,7 @@ class DoosanCubeStackEnvCfg(StackEnvCfg):
         # We use absolute JointPositionActionCfg for arm joints (1-6)
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot",
-            joint_names=["joint_?[1-6]"],
+            joint_names=["joint_[1-6]"],
             scale=0.5,
             use_default_offset=True,
         )
@@ -124,7 +140,7 @@ class DoosanCubeStackEnvCfg(StackEnvCfg):
         # Stacking Cube 1 (Target Object)
         self.scene.cube_1 = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Cube_1",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.45, -0.05, 0.025], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.5, -0.05, 0.025], rot=[1, 0, 0, 0]),
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/blue_block.usd",
                 scale=(1.0, 1.0, 1.0),
@@ -136,7 +152,7 @@ class DoosanCubeStackEnvCfg(StackEnvCfg):
         # Stacking Cube 2 (Base Object)
         self.scene.cube_2 = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Cube_2",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.55, 0.05, 0.025], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.6, 0.05, 0.025], rot=[1, 0, 0, 0]),
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/red_block.usd",
                 scale=(1.0, 1.0, 1.0),

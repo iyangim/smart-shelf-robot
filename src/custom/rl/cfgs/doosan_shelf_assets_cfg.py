@@ -42,7 +42,7 @@ DOOSAN_E0509_CFG = ArticulationCfg(
     ), 
     actuators={
         "doosan_arm": ImplicitActuatorCfg(
-            joint_names_expr=["joint_?[1-6]"],
+            joint_names_expr=["joint_[1-6]"],
             stiffness=800.0,
             damping=40.0,
             friction=0.1,
@@ -50,6 +50,7 @@ DOOSAN_E0509_CFG = ArticulationCfg(
     },
     soft_joint_pos_limit_factor=1.0,
 ) 
+
 
 # 2. 편의점 스마트 진열대 가판대 환경 구조화 정의 
 SMART_SHELF_CFG = AssetBaseCfg( 
@@ -110,7 +111,7 @@ DOOSAN_E0509_WITH_GRIPPER_CFG = ArticulationCfg(
     ),
     actuators={
         "doosan_arm": ImplicitActuatorCfg(
-            joint_names_expr=["joint_?[1-6]"],
+            joint_names_expr=["joint_[1-6]"],
             stiffness=800.0,
             damping=40.0,
             friction=0.1,

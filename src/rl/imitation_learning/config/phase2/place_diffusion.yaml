@@ -1,0 +1,95 @@
+# Diffusion Policy Config - Doosan Place (Phase 2)
+# Standalone or real-stanford/diffusion_policy compatible configuration
+
+name: place_diffusion
+_target_: diffusion_policy.workspace.train_diffusion_unet_lowdim_workspace.TrainDiffusionUnetLowdimWorkspace
+
+# Task Configuration
+task:
+  name: place
+  dataset:
+    _target_: diffusion_policy.dataset.base_dataset.BaseLowdimDataset
+    zarr_path: ${oc.env:DATA_DIR}/doosan_place.zarr
+    horizon: 16
+    pad_before: 1
+    pad_after: 7
+    seed: 42
+    val_ratio: 0.02
+  shape_meta:
+    obs:
+      state:
+        shape: [41]  # joint_pos(6) + joint_vel(6) + eef_pos(3) + eef_quat(4) + slot_position(3) + slot_orientation(4) + slot_tolerance(3) + object_position(3) + gripper(2) + last_action(7)
+    action:
+      shape: [7]  # 6-DOF arm joints + 1 gripper binary command
+
+# Policy Network Configuration
+policy:
+  _target_: diffusion_policy.policy.diffusion_unet_lowdim_policy.DiffusionUnetLowdimPolicy
+
+  model:
+    _target_: diffusion_policy.model.diffusion.conditional_unet1d.ConditionalUnet1D
+    input_dim: 7  # action dim
+    local_cond_dim: null
+    global_cond_dim: 41  # state dim
+    diffusion_step_embed_dim: 128
+    down_dims: [256, 512, 1024]
+    kernel_size: 3
+    n_groups: 8
+    cond_predict_scale: true
+
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_start: 0.0001
+    beta_end: 0.02
+    beta_schedule: squaredcos_cap_v2
+    variance_type: fixed_small
+    clip_sample: true
+    prediction_type: epsilon
+
+  horizon: 16
+  obs_dim: 41
+  action_dim: 7
+  n_action_steps: 8
+  n_obs_steps: 2
+  num_inference_steps: 16
+
+# EMA Configuration
+ema:
+  _target_: diffusion_policy.model.common.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+# Training Settings
+training:
+  device: cuda:0
+  seed: 42
+  num_epochs: 500
+  gradient_accumulate_every: 1
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+
+  # DataLoader
+  batch_size: 64
+  num_workers: 4
+
+  # Logging
+  log_freq: 100
+  save_freq: 50
+
+  # Checkpoint
+  checkpoint_every: 50
+  resume: true
+
+# Logging
+logging:
+  project: doosan_place_diffusion
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_place_lowdim
+  id: null
+  group: null

@@ -1,0 +1,9 @@
+# Goal definition
+string instruction
+---
+# Result definition
+bool success
+---
+# Feedback definition
+string current_status
+geometry_msgs/PoseStamped macro_target

@@ -1,4 +1,5 @@
 import os
+os.environ["ROS_PACKAGE_PATH"] = "/home/iyangim/smart-shelf-robot/src/external/doosan-robot2:/home/iyangim/smart-shelf-robot/src/external/RH-P12-RN-A"
 import argparse
 from isaaclab.app import AppLauncher
 

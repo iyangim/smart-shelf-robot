@@ -1,0 +1,114 @@
+# Diffusion Policy Config - VLA Multimodal (Phase 4)
+# Compatible with image-based conditional Diffusion Policy (e.g. real-stanford/diffusion_policy image workspace)
+
+name: vla_diffusion_image
+_target_: diffusion_policy.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+
+# Task Configuration
+task:
+  name: vla_shelf_tasks
+  dataset:
+    _target_: diffusion_policy.dataset.base_dataset.BaseImageDataset
+    zarr_path: ${oc.env:DATA_DIR}/vla_shelf_tasks.zarr
+    horizon: 16
+    pad_before: 1
+    pad_after: 7
+    seed: 42
+    val_ratio: 0.02
+  shape_meta:
+    obs:
+      image:
+        shape: [3, 224, 224]  # RGB camera feed from RealSense
+        type: rgb
+      language:
+        shape: [768]  # Text command embeddings (BERT/CLIP)
+        type: low_dim
+      state:
+        shape: [9]  # robot_joint_pos(6) + ee_pos(3)
+        type: low_dim
+    action:
+      shape: [7]  # 6 arm joints + 1 gripper binary command
+
+# Policy Network Configuration
+policy:
+  _target_: diffusion_policy.policy.diffusion_unet_image_policy.DiffusionUnetImagePolicy
+
+  # Image Encoder (ResNet-18 + Spatial Softmax)
+  obs_encoder:
+    _target_: diffusion_policy.model.vision.multi_image_obs_encoder.MultiImageObsEncoder
+    rgb_model:
+      _target_: diffusion_policy.model.vision.model_getter.get_resnet
+      name: resnet18
+      weights: IMAGENET1K_V1
+    feature_dimension: 64
+    pool_class: SpatialSoftmax
+    pool_kwargs:
+      num_kp: 32
+      learnable_temperature: false
+      temperature: 1.0
+
+  model:
+    _target_: diffusion_policy.model.diffusion.conditional_unet1d.ConditionalUnet1D
+    input_dim: 7  # action dim
+    local_cond_dim: null
+    global_cond_dim: 841  # (image_feat: 64) + (language_feat: 768) + (state_feat: 9) = 841
+    diffusion_step_embed_dim: 128
+    down_dims: [512, 1024, 2048]
+    kernel_size: 3
+    n_groups: 8
+    cond_predict_scale: true
+
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddpm.DDPMScheduler
+    num_train_timesteps: 100
+    beta_start: 0.0001
+    beta_end: 0.02
+    beta_schedule: squaredcos_cap_v2
+    variance_type: fixed_small
+    clip_sample: true
+    prediction_type: epsilon
+
+  horizon: 16
+  n_action_steps: 8
+  n_obs_steps: 2
+  num_inference_steps: 16
+
+# EMA Configuration
+ema:
+  _target_: diffusion_policy.model.common.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+# Training Settings
+training:
+  device: cuda:0
+  seed: 42
+  num_epochs: 500
+  gradient_accumulate_every: 1
+  lr: 1.0e-4
+  weight_decay: 1.0e-6
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+
+  # DataLoader
+  batch_size: 32  # Smaller batch size for image/vision tasks due to VRAM limits
+  num_workers: 4
+
+  # Logging
+  log_freq: 100
+  save_freq: 50
+
+  # Checkpoint
+  checkpoint_every: 50
+  resume: true
+
+# Logging
+logging:
+  project: doosan_vla_diffusion
+  mode: online
+  name: ${now:%Y.%m.%d-%H.%M.%S}_vla_image
+  id: null
+  group: null

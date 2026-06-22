@@ -7,7 +7,10 @@ import math
 import os
 import sys
 
+import isaaclab.sim as sim_utils
+from isaaclab.assets import AssetBaseCfg
 from isaaclab.utils import configclass
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
 from isaaclab_tasks.manager_based.manipulation.reach.reach_env_cfg import ReachEnvCfg
 
@@ -23,6 +26,16 @@ class DoosanReachEnvCfg(ReachEnvCfg):
 
         # switch robot to doosan e0509
         self.scene.robot = DOOSAN_E0509_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        
+        # Add robot mount stand
+        self.scene.mount = AssetBaseCfg(
+            prim_path="{ENV_REGEX_NS}/Mount",
+            spawn=sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/Stand/stand_instanceable.usd",
+                scale=(2.0, 2.0, 2.0),
+            ),
+            init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        )
         
         # override rewards to track link_6 (which is the Doosan end-effector/tool flange)
         self.rewards.end_effector_position_tracking.params["asset_cfg"].body_names = ["link_6"]

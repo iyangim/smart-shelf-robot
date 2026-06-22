@@ -6,7 +6,8 @@ import os
 import sys
 import math
 
-from isaaclab.assets import RigidObjectCfg
+import isaaclab.sim as sim_utils
+from isaaclab.assets import AssetBaseCfg, RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
@@ -90,6 +91,21 @@ class DoosanLiftEnvCfg(LiftEnvCfg):
         self.scene.robot = DOOSAN_E0509_WITH_GRIPPER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]
 
+        # Add robot mount stand
+        self.scene.mount = AssetBaseCfg(
+            prim_path="{ENV_REGEX_NS}/Mount",
+            spawn=sim_utils.UsdFileCfg(
+                usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/Stand/stand_instanceable.usd",
+                scale=(2.0, 2.0, 2.0),
+            ),
+            init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0)),
+        )
+
+        # Override table to match Task 1 (Reach)
+        self.scene.table.init_state.pos = (0.55, 0.0, 0.0)
+        self.scene.table.init_state.rot = (0.70711, 0.0, 0.0, 0.70711)
+        self.scene.table.spawn.scale = (1.0, 1.0, 1.0)
+
         # Add semantics to mount structures
         self.scene.table.spawn.semantic_tags = [("class", "table")]
         self.scene.plane.semantic_tags = [("class", "ground")]
@@ -98,7 +114,7 @@ class DoosanLiftEnvCfg(LiftEnvCfg):
         # We use absolute JointPositionActionCfg for arm joints (1-6)
         self.actions.arm_action = mdp.JointPositionActionCfg(
             asset_name="robot",
-            joint_names=["joint_?[1-6]"],
+            joint_names=["joint_[1-6]"],
             scale=0.5,
             use_default_offset=True,
         )
@@ -117,7 +133,7 @@ class DoosanLiftEnvCfg(LiftEnvCfg):
         # Configure target Object (DexCube)
         self.scene.object = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Object",
-            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.5, 0.0, 0.055], rot=[1, 0, 0, 0]),
+            init_state=RigidObjectCfg.InitialStateCfg(pos=[0.55, 0.0, 0.032], rot=[1, 0, 0, 0]),
             spawn=UsdFileCfg(
                 usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Blocks/DexCube/dex_cube_instanceable.usd",
                 scale=(0.8, 0.8, 0.8),
@@ -135,6 +151,7 @@ class DoosanLiftEnvCfg(LiftEnvCfg):
 
         # Configure End-effector Frame and command generator body target
         self.commands.object_pose.body_name = "link_6"
+        self.commands.object_pose.ranges.pos_x = (0.45, 0.65)
 
         marker_cfg = FRAME_MARKER_CFG.copy()
         marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)

@@ -9,7 +9,7 @@
 
 import os
 
-from isaaclab.assets import RigidObjectCfg
+from isaaclab.assets import AssetBaseCfg, RigidObjectCfg
 from isaaclab.sensors import FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.sim.schemas.schemas_cfg import RigidBodyPropertiesCfg
@@ -28,7 +28,7 @@ from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from cfgs.dynamic_objects_cfg import get_dynamic_object_cfg  # noqa: E402
-from cfgs.doosan_shelf_assets_cfg import DOOSAN_E0509_WITH_GRIPPER_CFG  # noqa: E402
+from cfgs.doosan_shelf_assets_cfg import DOOSAN_E0509_WITH_GRIPPER_CFG, SMART_SHELF_CFG  # noqa: E402
 from cfgs.gripper_cfg import (  # noqa: E402
     GRIPPER_JOINT_NAMES,
     GRIPPER_OPEN_COMMAND,
@@ -54,13 +54,22 @@ class DoosanPlaceEnvCfg(PlaceEnvCfg):
         # 부모 초기화
         super().__post_init__()
 
+        # ── 매대 에셋 ──────────────────────────────────────────
+        self.scene.shelf = SMART_SHELF_CFG.replace(
+            prim_path="{ENV_REGEX_NS}/Shelf"
+        )
+        self.scene.shelf.init_state = AssetBaseCfg.InitialStateCfg(
+            pos=[0.25, 0.04, -0.73],
+            rot=[1.0, 0.0, 0.0, 0.0],
+        )
+
         # ── 로봇 에셋 ──────────────────────────────────────────
         self.scene.robot = DOOSAN_E0509_WITH_GRIPPER_CFG.replace(
             prim_path="{ENV_REGEX_NS}/Robot"
         )
         # Place 태스크 초기 자세: 물체를 파지한 상태로 매대 앞에 위치
         self.scene.robot.init_state.joint_pos = {
-            "joint_1": 0.0,
+            "joint_1": 0.876,  # 50.2 deg - 방향 정렬
             "joint_2": -0.5,   # 매대 높이에 맞춘 어깨 각도
             "joint_3": 1.2,    # 팔꿈치 — 매대 방향 뻗기
             "joint_4": 0.0,
@@ -95,22 +104,22 @@ class DoosanPlaceEnvCfg(PlaceEnvCfg):
         # ── 배치 대상 물체 (파지된 상태로 초기화) ──────────────
         # 초기 위치: EE 근처 (파지 중 - CFG 팩토리를 통해 동적 생성)
         from cfgs.dynamic_objects_cfg import OBJECT_HEIGHT_OFFSETS
-        z_init = 0.33 + OBJECT_HEIGHT_OFFSETS[self.object_type]
+        z_init = 0.46 + OBJECT_HEIGHT_OFFSETS[self.object_type]
         self.scene.object = get_dynamic_object_cfg(
             self.object_type,
             prim_path="{ENV_REGEX_NS}/Object",
-            pos=[0.35, 0.0, z_init],
+            pos=[0.25, 0.30, z_init],
             rot=[1.0, 0.0, 0.0, 0.0],
         )
 
         # ── 매대 빈 슬롯 (배치 목표 마커) ────────────────────
         # 슬롯은 비가시 Rigid Body로, 물체 배치 목표 위치를 나타냅니다.
-        # 매대 바닥 높이(z=0.28) 기준으로 물품 중심 높이를 정밀 계산
-        z_slot = 0.28 + OBJECT_HEIGHT_OFFSETS[self.object_type]
+        # 매대 바닥 높이(z=0.41) 기준으로 물품 중심 높이를 정밀 계산
+        z_slot = 0.41 + OBJECT_HEIGHT_OFFSETS[self.object_type]
         self.scene.slot = RigidObjectCfg(
             prim_path="{ENV_REGEX_NS}/Slot",
             init_state=RigidObjectCfg.InitialStateCfg(
-                pos=[0.55, 0.0, z_slot],   # 매대 내부 슬롯 중심
+                pos=[0.25, 0.50, z_slot],   # 매대 내부 슬롯 중심
                 rot=[1.0, 0.0, 0.0, 0.0],
             ),
             spawn=UsdFileCfg(
